@@ -229,7 +229,7 @@ const App = () => {
         </div>
       </div>
 
-      {/* REQ-011: Bỏ qua hoạt động */}
+      {/* Bỏ qua hoạt ảnh */}
       <div className="w-full mt-4 flex items-center gap-2 text-sm text-gray-400">
         <input 
           type="checkbox" 
@@ -238,15 +238,7 @@ const App = () => {
           onChange={(e) => setIsSkipChecked(e.target.checked)}
           className="w-4 h-4 accent-yellow-500"
         />
-        <label htmlFor="skip">Bỏ qua hoạt động</label>
-        <span className="ml-auto text-xs">Số lượt đặt lại sau: 15 giờ 45</span>
-      </div>
-
-      {/* REQ-012: Điều hướng tính năng phụ */}
-      <div className="w-full mt-auto pt-4 grid grid-cols-3 gap-2">
-        <button className="bg-blue-800 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold">Nhiệm vụ</button>
-        <button className="bg-blue-800 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold">Xổ Số</button>
-        <button className="bg-blue-800 hover:bg-blue-700 py-2 rounded-lg text-sm font-semibold">Trao đổi</button>
+        <label htmlFor="skip">Bỏ qua hoạt ảnh</label>
       </div>
 
     </div>
