@@ -4,6 +4,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
 import { REWARDS, INITIAL_TURNS, MILESTONES } from './constants';
 import './index.css'; // Import file CSS (Tailwind)
+import Header from './components/Header';
+import GameControls from './components/GameControls';
 
 interface Cell {
   id: string;
@@ -215,12 +217,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans max-w-xl mx-auto relative overflow-hidden">
-      
-      {/* REQ-007: Thông tin sự kiện */}
-      <div className="w-full bg-yellow-500 text-black text-center py-2 rounded-t-xl font-bold relative">
-        🏖️ Bóng Chuyền Bãi Biển
-      </div>
-
+      <Header />
       <div className="flex w-full mt-4 gap-4">
         {/* REQ-004 & REQ-013: Thanh tiến độ cột bên trái */}
         <div className="w-24 flex flex-col items-center bg-gray-800 rounded-lg py-4 relative">
@@ -313,36 +310,14 @@ const App = () => {
         {bannerMessage}
       </div>
 
-      {/* REQ-003: Button Chơi & Lượt chơi */}
-      <div className="w-full mt-2 flex flex-col items-center">
-        <button
-          onClick={handlePlay}
-          disabled={turns <= 0 || isFlipping || wonLines.length >= 3}
-          className={`w-full py-4 rounded-xl text-xl font-bold shadow-lg transition-transform active:scale-95 ${
-            turns > 0 && !isFlipping && wonLines.length < 3
-              ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 text-black hover:from-yellow-400 hover:to-yellow-300' 
-              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {wonLines.length >= 3 ? 'KẾT THÚC' : isFlipping ? 'ĐANG LẬT...' : 'CHƠI'}
-        </button>
-        <div className="mt-2 text-sm text-gray-300">
-          Số lượt còn lại: <span className="text-yellow-400 font-bold">{turns}</span>
-        </div>
-      </div>
-
-      {/* Bỏ qua hoạt ảnh */}
-      <div className="w-full mt-4 flex items-center gap-2 text-sm text-gray-400">
-        <input 
-          type="checkbox" 
-          id="skip" 
-          checked={isSkipChecked}
-          onChange={(e) => setIsSkipChecked(e.target.checked)}
-          className="w-4 h-4 accent-yellow-500"
-        />
-        <label htmlFor="skip">Bỏ qua hoạt ảnh</label>
-      </div>
-
+      <GameControls
+        turns={turns}
+        isFlipping={isFlipping}
+        wonLines={wonLines}
+        isSkipChecked={isSkipChecked}
+        onSkipChange={setIsSkipChecked}
+        onPlay={handlePlay}
+      />
     </div>
   );
 };
