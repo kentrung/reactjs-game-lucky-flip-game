@@ -1,15 +1,9 @@
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faLock } from '@fortawesome/free-solid-svg-icons';
+import { REWARDS, INITIAL_TURNS, MILESTONES } from './constants';
 import './index.css'; // Import file CSS (Tailwind)
-
-// Cấu hình các phần thưởng có thể xuất hiện trong ô
-const REWARDS = [
-  { icon: '🥥', points: 10 },
-  { icon: '🍋', points: 20 },
-  { icon: '🍊', points: 30 },
-  { icon: '🍇', points: 40 },
-  { icon: '💎', points: 100 },
-];
 
 interface Cell {
   id: string;
@@ -20,6 +14,38 @@ interface Cell {
 }
 
 type Grid = Cell[][];
+
+// Trả về id các ô thuộc những hàng/cột/chéo đã lật đủ (dùng để highlight)
+const getWinningCells = (grid: Grid): string[] => {
+  const ids = new Set<string>();
+
+  for (let r = 0; r < 5; r++) {
+    if (grid[r].every(cell => cell.isRevealed)) {
+      for (let c = 0; c < 5; c++) ids.add(grid[r][c].id);
+    }
+  }
+
+  for (let c = 0; c < 5; c++) {
+    let isFull = true;
+    for (let r = 0; r < 5; r++) {
+      if (!grid[r][c].isRevealed) isFull = false;
+    }
+    if (isFull) {
+      for (let r = 0; r < 5; r++) ids.add(grid[r][c].id);
+    }
+  }
+
+  let diag1Full = true;
+  let diag2Full = true;
+  for (let i = 0; i < 5; i++) {
+    if (!grid[i][i].isRevealed) diag1Full = false;
+    if (!grid[i][4 - i].isRevealed) diag2Full = false;
+  }
+  if (diag1Full) for (let i = 0; i < 5; i++) ids.add(grid[i][i].id);
+  if (diag2Full) for (let i = 0; i < 5; i++) ids.add(grid[i][4 - i].id);
+
+  return [...ids];
+};
 
 // Hàm khởi tạo lưới 5x5 (REQ-001, REQ-008, REQ-009)
 const generateInitialGrid = (): Grid => {
@@ -33,7 +59,7 @@ const generateInitialGrid = (): Grid => {
         icon: reward.icon,
         points: reward.points,
         isRevealed: false,
-        isLocked: Math.random() < 0.1, // 10% cơ hội bị khóa (REQ-008)
+        isLocked: false,
       });
     }
     grid.push(currentRow);
@@ -41,22 +67,38 @@ const generateInitialGrid = (): Grid => {
   return grid;
 };
 
+// Điểm thưởng của từng loại line (hàng/cột = 150, chéo = 300)
+const getLinePoints = (key: string): number => (key.startsWith('diag') ? 300 : 150);
+
+// Với 1 ô trên vòng rìa 7x7, trả về line mà nó đại diện (hàng/cột/chéo)
+const getRingLineKey = (R: number, C: number): string | null => {
+  if (R === 0 || R === 6) {
+    if (C >= 1 && C <= 5) return `col-${C - 1}`;
+    if (C === 0) return R === 0 ? 'diag-1' : 'diag-2';
+    if (C === 6) return R === 0 ? 'diag-2' : 'diag-1';
+  }
+  if (C === 0 || C === 6) {
+    if (R >= 1 && R <= 5) return `row-${R - 1}`;
+  }
+  return null;
+};
+
 const App = () => {
   // --- STATE ---
   const [grid, setGrid] = useState(generateInitialGrid);
-  const [turns, setTurns] = useState(200); // REQ-002
+  const [turns, setTurns] = useState(INITIAL_TURNS);
   const [score, setScore] = useState(0); // Dùng cho thanh tiến độ (REQ-004)
   const [bannerMessage, setBannerMessage] = useState('');
   const [isSkipChecked, setIsSkipChecked] = useState(false); // REQ-011
-
-  // Mốc phần thưởng cho thanh tiến độ (REQ-013)
-  const milestones = [100, 300, 600, 1000];
+  const [flipCellId, setFlipCellId] = useState<string | null>(null);
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [wonLines, setWonLines] = useState<string[]>([]);
 
   // --- LOGIC XỬ LÝ ---
 
-  // REQ-005: Click Chơi -> Lật ngẫu nhiên 1 ô
+  // REQ-005: Click Chơi -> Lật ngẫu nhiên 1 ô (có hiệu ứng, khóa nút trong lúc lật)
   const handlePlay = () => {
-    if (turns <= 0) return;
+    if (turns <= 0 || isFlipping || wonLines.length >= 3) return;
 
     // Lọc ra các ô chưa lật và không bị khóa
     const availableCells: { r: number; c: number }[] = [];
@@ -77,38 +119,58 @@ const App = () => {
     const randomIndex = Math.floor(Math.random() * availableCells.length);
     const { r, c } = availableCells[randomIndex];
 
-    // Cập nhật state (tạo bản sao để đảm bảo immutability)
-    const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
-    newGrid[r][c].isRevealed = true;
-    setGrid(newGrid);
-    setTurns(prev => prev - 1);
+    setIsFlipping(true);
+    setFlipCellId(`${r}-${c}`);
 
-    // REQ-006: Kiểm tra ăn hàng (điểm thưởng)
-    checkLines(newGrid);
+    const finishFlip = () => {
+      // Cập nhật state (tạo bản sao để đảm bảo immutability)
+      const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
+      newGrid[r][c].isRevealed = true;
+      setGrid(newGrid);
+      setTurns(prev => prev - 1);
+
+      // REQ-006: Kiểm tra ăn hàng (điểm thưởng)
+      checkLines(newGrid);
+
+      setFlipCellId(null);
+      setIsFlipping(false);
+    };
+
+    // REQ-xxx: Bỏ qua hoạt ảnh nếu checkbox được tick
+    if (isSkipChecked) {
+      finishFlip();
+    } else {
+      setTimeout(finishFlip, 1000);
+    }
   };
 
   // REQ-006: Logic ăn hàng điểm khi lật đủ đường thẳng/chéo
   const checkLines = (currentGrid: Grid) => {
     let bonusPoints = 0;
-    let messages = [];
+    const messages: string[] = [];
+    const newLines: string[] = [];
 
     // Kiểm tra Hàng Ngang
     for (let r = 0; r < 5; r++) {
-      if (currentGrid[r].every(cell => cell.isRevealed)) {
+      const key = `row-${r}`;
+      if (currentGrid[r].every(cell => cell.isRevealed) && !wonLines.includes(key)) {
         bonusPoints += 150;
         messages.push(`Hàng ${r + 1}`);
+        newLines.push(key);
       }
     }
 
     // Kiểm tra Hàng Dọc
     for (let c = 0; c < 5; c++) {
+      const key = `col-${c}`;
       let isFull = true;
       for (let r = 0; r < 5; r++) {
         if (!currentGrid[r][c].isRevealed) isFull = false;
       }
-      if (isFull) {
+      if (isFull && !wonLines.includes(key)) {
         bonusPoints += 150;
         messages.push(`Cột ${c + 1}`);
+        newLines.push(key);
       }
     }
 
@@ -119,90 +181,130 @@ const App = () => {
       if (!currentGrid[i][i].isRevealed) diag1Full = false;
       if (!currentGrid[i][4 - i].isRevealed) diag2Full = false;
     }
-    if (diag1Full) { bonusPoints += 300; messages.push('Chéo chính'); }
-    if (diag2Full) { bonusPoints += 300; messages.push('Chéo phụ'); }
+    if (diag1Full && !wonLines.includes('diag-1')) {
+      bonusPoints += 300;
+      messages.push('Chéo chính');
+      newLines.push('diag-1');
+    }
+    if (diag2Full && !wonLines.includes('diag-2')) {
+      bonusPoints += 300;
+      messages.push('Chéo phụ');
+      newLines.push('diag-2');
+    }
 
-    if (bonusPoints > 0) {
+    if (newLines.length > 0) {
+      setWonLines(prev => [...prev, ...newLines]);
       setScore(prev => prev + bonusPoints);
-      setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (+${bonusPoints} điểm)`);
-      setTimeout(() => setBannerMessage(''), 3000); // Xóa thông báo sau 3s
+
+      // Dừng trò chơi khi đã ăn đủ 3 line
+      if (wonLines.length + newLines.length >= 3) {
+        setBannerMessage(`🎉 Đã ăn đủ 3 line! Trò chơi kết thúc.`);
+      } else {
+        setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (+${bonusPoints} điểm)`);
+        setTimeout(() => setBannerMessage(''), 3000); // Xóa thông báo sau 3s
+      }
     }
   };
 
+  // Highlight cố định cho các hàng/cột/chéo đã hoàn thành
+  const winningCells = getWinningCells(grid);
+
   // Tính toán % thanh tiến độ
-  const maxMilestone = milestones[milestones.length - 1];
+  const maxMilestone = MILESTONES[MILESTONES.length - 1];
   const progressPercent = Math.min((score / maxMilestone) * 100, 100);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans max-w-md mx-auto relative overflow-hidden">
+    <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans max-w-xl mx-auto relative overflow-hidden">
       
       {/* REQ-007: Thông tin sự kiện */}
       <div className="w-full bg-yellow-500 text-black text-center py-2 rounded-t-xl font-bold relative">
         🏖️ Bóng Chuyền Bãi Biển
-        <div className="text-xs font-normal">Sự kiện kết thúc sau: 04 ngày 15 giờ</div>
-      </div>
-
-      {/* REQ-014: Hiển thị tài nguyên */}
-      <div className="w-full bg-gray-800 flex justify-between px-4 py-2 text-sm border-b border-gray-700">
-        <span>🥥 x65</span>
-        <span>🎟️ x12</span>
       </div>
 
       <div className="flex w-full mt-4 gap-4">
         {/* REQ-004 & REQ-013: Thanh tiến độ cột bên trái */}
-        <div className="w-16 flex flex-col items-center bg-gray-800 rounded-lg py-4 relative">
-          <div className="text-xs mb-2">Điểm: {score}</div>
-          <div className="w-4 h-64 bg-gray-700 rounded-full relative overflow-hidden flex flex-col justify-end">
-            <div 
-              className="w-full bg-gradient-to-t from-yellow-400 to-yellow-200 transition-all duration-500"
-              style={{ height: `${progressPercent}%` }}
-            ></div>
+        <div className="w-24 flex flex-col items-center bg-gray-800 rounded-lg py-4 relative">
+          <div className="flex flex-1 w-full items-stretch justify-center gap-2">
+            <div className="w-4 bg-gray-700 rounded-full relative overflow-hidden flex flex-col justify-end">
+              <div 
+                className="w-full bg-gradient-to-t from-yellow-400 to-yellow-200 transition-all duration-500"
+                style={{ height: `${progressPercent}%` }}
+              ></div>
+            </div>
+            {/* Các mốc phần thưởng */}
+            <div className="flex flex-col justify-between py-2 text-[10px] text-gray-400">
+              {[...MILESTONES].reverse().map((m, idx) => (
+                <div key={idx} className={`flex items-center gap-1 ${score >= m ? 'text-yellow-400 font-bold' : ''}`}>
+                  <div className={`w-2 h-2 rounded-full ${score >= m ? 'bg-yellow-400' : 'bg-gray-600'}`}></div>
+                  <span>{m}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          {/* Các mốc phần thưởng */}
-          <div className="absolute top-0 bottom-0 right-0 flex flex-col justify-between py-10 text-[10px] text-gray-400">
-            {milestones.map((m, idx) => (
-              <div key={idx} className={`flex items-center gap-1 ${score >= m ? 'text-yellow-400 font-bold' : ''}`}>
-                <span>{m}</span>
-                <div className={`w-2 h-2 rounded-full ${score >= m ? 'bg-yellow-400' : 'bg-gray-600'}`}></div>
-              </div>
-            ))}
-          </div>
+          <div className="text-xs mt-2">Điểm: {score}</div>
         </div>
 
-        {/* REQ-001: Khung trò chơi 5x5 */}
-        <div className="flex-1 grid grid-cols-5 gap-1 bg-blue-900 p-2 rounded-lg border-4 border-yellow-600">
-          {grid.map(row => (
-            row.map(cell => (
-              <div
-                key={cell.id}
-                onClick={() => {
-                  // Cho phép click trực tiếp vào ô để lật (tuỳ chọn thêm)
-                  if (!cell.isRevealed && !cell.isLocked && turns > 0) {
-                    handlePlay(); // Gọi logic lật ngẫu nhiên hoặc xử lý riêng ô này
-                  }
-                }}
-                className={`aspect-square flex items-center justify-center rounded-md text-xl font-bold transition-all duration-300 ${
-                  cell.isRevealed 
-                    ? 'bg-yellow-100 text-black shadow-inner transform scale-95' 
-                    : cell.isLocked 
-                      ? 'bg-gray-700 cursor-not-allowed' 
-                      : 'bg-yellow-400 cursor-pointer hover:bg-yellow-300'
-                }`}
-              >
-                {/* REQ-009: Hiển thị phần thưởng khi lật */}
-                {cell.isRevealed ? (
-                  <div className="flex flex-col items-center">
-                    <span>{cell.icon}</span>
-                    <span className="text-[10px] text-gray-600">x{cell.points}</span>
+        {/* REQ-001: Khung trò chơi 5x5 bao ngoài bởi vòng ô điểm 7x7 */}
+        <div className="flex-1 grid grid-cols-7 gap-1 bg-[#411a1b] p-2 rounded-lg">
+          {Array.from({ length: 7 }).flatMap((_, R) =>
+            Array.from({ length: 7 }).map((_, C) => {
+              const isBoard = R >= 1 && R <= 5 && C >= 1 && C <= 5;
+
+              if (isBoard) {
+                const cell = grid[R - 1][C - 1];
+                return (
+                  <div
+                    key={cell.id}
+                    className={`cell ${winningCells.includes(cell.id) ? 'winning' : ''}`}
+                  >
+                    <div className={`cell-inner ${flipCellId === cell.id || cell.isRevealed ? 'flipped' : ''} ${isSkipChecked ? 'no-transition' : ''}`}>
+                      {/* Mặt trước: ô chưa lật */}
+                      <div className={`cell-face text-xl font-bold ${cell.isLocked ? 'bg-gray-700' : 'bg-yellow-400'}`}>
+                        {cell.isLocked ? (
+                          <span className="text-gray-400">🔒</span>
+                        ) : (
+                          <span className="text-yellow-600 opacity-50">?</span>
+                        )}
+                      </div>
+                      {/* Mặt sau: phần thưởng khi lật */}
+                      <div className="cell-face cell-face-back bg-yellow-100 text-black text-xl font-bold">
+                        <div className="flex flex-col items-center">
+                          <span>{cell.icon}</span>
+                          <span className="text-[10px] text-gray-600">x{cell.points}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                ) : cell.isLocked ? (
-                  <span className="text-gray-400">🔒</span> // REQ-008: Icon ổ khóa
-                ) : (
-                  <span className="text-yellow-600 opacity-50">?</span>
-                )}
-              </div>
-            ))
-          ))}
+                );
+              }
+
+              // Ô rìa: hiện ổ khóa khi chưa ăn được, sáng rõ + mất khóa khi ăn được
+              const lineKey = getRingLineKey(R, C);
+              const isWon = lineKey ? wonLines.includes(lineKey) : false;
+              return (
+                <div
+                  key={`ring-${R}-${C}`}
+                  className="aspect-square relative border border-yellow-400 rounded-md transition-all duration-300"
+                >
+                  <div
+                    className={`absolute inset-0 flex items-center justify-center rounded-md text-[10px] font-bold ${
+                      isWon
+                        ? 'bg-yellow-400 text-black shadow'
+                        : 'bg-blue-800/60 text-yellow-400 opacity-50'
+                    }`}
+                  >
+                    {lineKey ? `+${getLinePoints(lineKey)}` : ''}
+                  </div>
+                  {!isWon && lineKey && (
+                    <FontAwesomeIcon
+                      icon={faLock}
+                      className="absolute top-0 right-0 text-[10px] text-yellow-400"
+                    />
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
@@ -215,14 +317,14 @@ const App = () => {
       <div className="w-full mt-2 flex flex-col items-center">
         <button
           onClick={handlePlay}
-          disabled={turns <= 0}
-          className={`w-full py-4 rounded-xl text-2xl font-bold shadow-lg transition-transform active:scale-95 ${
-            turns > 0 
+          disabled={turns <= 0 || isFlipping || wonLines.length >= 3}
+          className={`w-full py-4 rounded-xl text-xl font-bold shadow-lg transition-transform active:scale-95 ${
+            turns > 0 && !isFlipping && wonLines.length < 3
               ? 'bg-gradient-to-r from-yellow-500 to-yellow-400 text-black hover:from-yellow-400 hover:to-yellow-300' 
               : 'bg-gray-600 text-gray-400 cursor-not-allowed'
           }`}
         >
-          CHƠI
+          {wonLines.length >= 3 ? 'KẾT THÚC' : isFlipping ? 'ĐANG LẬT...' : 'CHƠI'}
         </button>
         <div className="mt-2 text-sm text-gray-300">
           Số lượt còn lại: <span className="text-yellow-400 font-bold">{turns}</span>
