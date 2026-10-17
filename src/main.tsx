@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
-import { INITIAL_TURNS, MILESTONES } from './constants';
+import { INITIAL_TURNS, MILESTONES, REWARDS, REQUIRED_WON_LINES } from './constants';
 import './index.css'; // Import file CSS (Tailwind)
 import Header from './components/Header';
 import GameControls from './components/GameControls';
@@ -22,16 +22,17 @@ const App = () => {
   const [turns, setTurns] = useState(INITIAL_TURNS);
   const [score, setScore] = useState(0); // Dùng cho thanh tiến độ (REQ-004)
   const [bannerMessage, setBannerMessage] = useState('');
-  const [isSkipChecked, setIsSkipChecked] = useState(false); // REQ-011
+  const [isSkipChecked, setIsSkipChecked] = useState(false);
   const [flipCellId, setFlipCellId] = useState<string | null>(null);
   const [isFlipping, setIsFlipping] = useState(false);
   const [wonLines, setWonLines] = useState<string[]>([]);
+  const [ticketsCollected, setTicketsCollected] = useState(0);
 
   // --- LOGIC XỬ LÝ ---
 
   // REQ-005: Click Chơi -> Lật ngẫu nhiên 1 ô (có hiệu ứng, khóa nút trong lúc lật)
   const handlePlay = () => {
-    if (turns <= 0 || isFlipping || wonLines.length >= 3) return;
+    if (turns <= 0 || isFlipping || wonLines.length >= REQUIRED_WON_LINES) return;
 
     // Chọn ngẫu nhiên 1 ô còn lật được (chưa lật & không bị khóa)
     const pickedCell = getRandomAvailableCell(grid);
@@ -51,7 +52,16 @@ const App = () => {
       const newGrid = cloneGrid(grid);
       newGrid[r][c].isRevealed = true;
       setGrid(newGrid);
-      setTurns(prev => prev - 1);
+
+      // Kiểm tra nếu ô vừa lật là vé chơi -> lưu vào ticketsCollected (chưa cộng vào turns)
+      const isTicket = REWARDS.find(rw => rw.isTicket)?.icon === newGrid[r][c].icon;
+      if (isTicket) {
+        setTicketsCollected(prev => prev + 1);
+        setBannerMessage('🎟️ Vé chơi! (thu thập - nhận khi hoàn thành 3 lines)');
+        setTimeout(() => setBannerMessage(''), 3000);
+      } else {
+        setTurns(prev => prev - 1);
+      }
 
       // REQ-006: Kiểm tra ăn hàng (điểm thưởng)
       const { bonusPoints, messages, newLines } = checkLines(newGrid, wonLines);
@@ -61,8 +71,14 @@ const App = () => {
         setScore(prev => prev + bonusPoints);
 
         // Dừng trò chơi khi đã ăn đủ 3 line
-        if (wonLines.length + newLines.length >= 3) {
-          setBannerMessage('🎉 Đã ăn đủ 3 line! Trò chơi kết thúc.');
+        if (wonLines.length + newLines.length >= REQUIRED_WON_LINES) {
+          // Cộng tổng vé chơi đã thu thập vào turns
+          if (ticketsCollected > 0) {
+            setTurns(prev => prev + ticketsCollected);
+            setBannerMessage(`🎉 Đã ăn đủ 3 line! +${ticketsCollected} lượt từ vé chơi. Trò chơi kết thúc.`);
+          } else {
+            setBannerMessage('🎉 Đã ăn đủ 3 line! Trò chơi kết thúc.');
+          }
         } else {
           setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (+${bonusPoints} điểm)`);
           setTimeout(() => setBannerMessage(''), 3000); // Xóa thông báo sau 3s
@@ -83,6 +99,12 @@ const App = () => {
 
   // Highlight cố định cho các hàng/cột/chéo đã hoàn thành
   const winningCells = getWinningCells(grid);
+
+  // Lấy màu nền tương ứng với điểm thưởng
+  const getRewardColor = (points: number): string => {
+    const reward = REWARDS.find(r => r.points === points);
+    return reward?.color ?? 'bg-yellow-100';
+  };
 
   // Tính toán % thanh tiến độ dựa trên điểm và các mốc phần thưởng
   const progressPercent = calculateProgress(score, MILESTONES);
@@ -136,7 +158,7 @@ const App = () => {
                         )}
                       </div>
                       {/* Mặt sau: phần thưởng khi lật */}
-                      <div className="cell-face cell-face-back bg-yellow-100 text-black text-xl font-bold">
+                      <div className={`cell-face cell-face-back ${getRewardColor(cell.points)} text-black text-xl font-bold`}>
                         <div className="flex flex-col items-center">
                           <span>{cell.icon}</span>
                           <span className="text-[10px] text-gray-600">x{cell.points}</span>

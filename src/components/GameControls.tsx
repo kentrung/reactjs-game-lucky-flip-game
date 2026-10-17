@@ -1,3 +1,5 @@
+import { REQUIRED_WON_LINES } from '../constants';
+
 interface GameControlsProps {
   turns: number;
   isFlipping: boolean;
@@ -29,14 +31,14 @@ export default function GameControls({
       </label>
       <button
         onClick={onPlay}
-        disabled={turns <= 0 || isFlipping || wonLines.length >= 3}
+        disabled={turns <= 0 || isFlipping || wonLines.length >= REQUIRED_WON_LINES}
         className={`px-8 py-2 rounded-lg text-xl font-bold shadow-lg transition-transform active:scale-95 ${
-          turns > 0 && !isFlipping && wonLines.length < 3
+          turns > 0 && !isFlipping && wonLines.length < REQUIRED_WON_LINES
             ? 'bg-[#fdd60d] text-black hover:from-yellow-400 hover:to-yellow-300 cursor-pointer'
             : 'bg-gray-600 text-gray-400 cursor-not-allowed'
         }`}
       >
-        {wonLines.length >= 3 ? 'KẾT THÚC' : 'CHƠI'}
+        {wonLines.length >= REQUIRED_WON_LINES ? 'KẾT THÚC' : 'CHƠI'}
       </button>
       <div className="text-sm text-gray-300">
         Số lượt còn lại: <span className="text-yellow-400 font-bold">{turns}</span>

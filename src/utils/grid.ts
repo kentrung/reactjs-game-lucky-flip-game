@@ -11,13 +11,24 @@ export const getCellId = (r: number, c: number): string => `${r}-${c}`;
 export const getRandomElement = <T>(arr: T[]): T =>
   arr[Math.floor(Math.random() * arr.length)];
 
-// Khởi tạo lưới 5x5: mỗi ô nhận 1 phần thưởng ngẫu nhiên (REQ-001, REQ-008, REQ-009)
+// Chọn ngẫu nhiên có trọng số (weight-based selection)
+export const getWeightedRandomElement = <T extends { weight: number }>(arr: T[]): T => {
+  const totalWeight = arr.reduce((sum, item) => sum + item.weight, 0);
+  let random = Math.random() * totalWeight;
+  for (const item of arr) {
+    random -= item.weight;
+    if (random <= 0) return item;
+  }
+  return arr[arr.length - 1];
+};
+
+// Khởi tạo lưới 5x5: mỗi ô nhận 1 phần thưởng ngẫu nhiên theo trọng số (REQ-001, REQ-008, REQ-009)
 export const generateInitialGrid = (): Grid => {
   const grid: Grid = [];
   for (let row = 0; row < GRID_SIZE; row++) {
     const currentRow: Cell[] = [];
     for (let col = 0; col < GRID_SIZE; col++) {
-      const reward = getRandomElement(REWARDS);
+      const reward = getWeightedRandomElement(REWARDS);
       currentRow.push({
         id: getCellId(row, col),
         icon: reward.icon,
