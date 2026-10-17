@@ -2,88 +2,19 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
-import { REWARDS, INITIAL_TURNS, MILESTONES } from './constants';
+import { INITIAL_TURNS, MILESTONES } from './constants';
 import './index.css'; // Import file CSS (Tailwind)
 import Header from './components/Header';
 import GameControls from './components/GameControls';
-
-interface Cell {
-  id: string;
-  icon: string;
-  points: number;
-  isRevealed: boolean;
-  isLocked: boolean;
-}
-
-type Grid = Cell[][];
-
-// Trả về id các ô thuộc những hàng/cột/chéo đã lật đủ (dùng để highlight)
-const getWinningCells = (grid: Grid): string[] => {
-  const ids = new Set<string>();
-
-  for (let r = 0; r < 5; r++) {
-    if (grid[r].every(cell => cell.isRevealed)) {
-      for (let c = 0; c < 5; c++) ids.add(grid[r][c].id);
-    }
-  }
-
-  for (let c = 0; c < 5; c++) {
-    let isFull = true;
-    for (let r = 0; r < 5; r++) {
-      if (!grid[r][c].isRevealed) isFull = false;
-    }
-    if (isFull) {
-      for (let r = 0; r < 5; r++) ids.add(grid[r][c].id);
-    }
-  }
-
-  let diag1Full = true;
-  let diag2Full = true;
-  for (let i = 0; i < 5; i++) {
-    if (!grid[i][i].isRevealed) diag1Full = false;
-    if (!grid[i][4 - i].isRevealed) diag2Full = false;
-  }
-  if (diag1Full) for (let i = 0; i < 5; i++) ids.add(grid[i][i].id);
-  if (diag2Full) for (let i = 0; i < 5; i++) ids.add(grid[i][4 - i].id);
-
-  return [...ids];
-};
-
-// Hàm khởi tạo lưới 5x5 (REQ-001, REQ-008, REQ-009)
-const generateInitialGrid = (): Grid => {
-  const grid: Grid = [];
-  for (let row = 0; row < 5; row++) {
-    const currentRow: Cell[] = [];
-    for (let col = 0; col < 5; col++) {
-      const reward = REWARDS[Math.floor(Math.random() * REWARDS.length)];
-      currentRow.push({
-        id: `${row}-${col}`,
-        icon: reward.icon,
-        points: reward.points,
-        isRevealed: false,
-        isLocked: false,
-      });
-    }
-    grid.push(currentRow);
-  }
-  return grid;
-};
-
-// Điểm thưởng của từng loại line (hàng/cột = 150, chéo = 300)
-const getLinePoints = (key: string): number => (key.startsWith('diag') ? 300 : 150);
-
-// Với 1 ô trên vòng rìa 7x7, trả về line mà nó đại diện (hàng/cột/chéo)
-const getRingLineKey = (R: number, C: number): string | null => {
-  if (R === 0 || R === 6) {
-    if (C >= 1 && C <= 5) return `col-${C - 1}`;
-    if (C === 0) return R === 0 ? 'diag-1' : 'diag-2';
-    if (C === 6) return R === 0 ? 'diag-2' : 'diag-1';
-  }
-  if (C === 0 || C === 6) {
-    if (R >= 1 && R <= 5) return `row-${R - 1}`;
-  }
-  return null;
-};
+import {
+  generateInitialGrid,
+  cloneGrid,
+  getCellId,
+  getWinningCells,
+  getRandomAvailableCell,
+} from './utils/grid';
+import { getLinePoints, getRingLineKey, checkLines } from './utils/lines';
+import { calculateProgress } from './utils/progress';
 
 const App = () => {
   // --- STATE ---
@@ -102,37 +33,41 @@ const App = () => {
   const handlePlay = () => {
     if (turns <= 0 || isFlipping || wonLines.length >= 3) return;
 
-    // Lọc ra các ô chưa lật và không bị khóa
-    const availableCells: { r: number; c: number }[] = [];
-    grid.forEach((row, r) => {
-      row.forEach((cell, c) => {
-        if (!cell.isRevealed && !cell.isLocked) {
-          availableCells.push({ r, c });
-        }
-      });
-    });
+    // Chọn ngẫu nhiên 1 ô còn lật được (chưa lật & không bị khóa)
+    const pickedCell = getRandomAvailableCell(grid);
 
-    if (availableCells.length === 0) {
+    if (!pickedCell) {
       setBannerMessage('Bạn đã lật hết tất cả các ô!');
       return;
     }
 
-    // Chọn ngẫu nhiên 1 ô
-    const randomIndex = Math.floor(Math.random() * availableCells.length);
-    const { r, c } = availableCells[randomIndex];
+    const { r, c } = pickedCell;
 
     setIsFlipping(true);
-    setFlipCellId(`${r}-${c}`);
+    setFlipCellId(getCellId(r, c));
 
     const finishFlip = () => {
       // Cập nhật state (tạo bản sao để đảm bảo immutability)
-      const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
+      const newGrid = cloneGrid(grid);
       newGrid[r][c].isRevealed = true;
       setGrid(newGrid);
       setTurns(prev => prev - 1);
 
       // REQ-006: Kiểm tra ăn hàng (điểm thưởng)
-      checkLines(newGrid);
+      const { bonusPoints, messages, newLines } = checkLines(newGrid, wonLines);
+
+      if (newLines.length > 0) {
+        setWonLines(prev => [...prev, ...newLines]);
+        setScore(prev => prev + bonusPoints);
+
+        // Dừng trò chơi khi đã ăn đủ 3 line
+        if (wonLines.length + newLines.length >= 3) {
+          setBannerMessage('🎉 Đã ăn đủ 3 line! Trò chơi kết thúc.');
+        } else {
+          setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (+${bonusPoints} điểm)`);
+          setTimeout(() => setBannerMessage(''), 3000); // Xóa thông báo sau 3s
+        }
+      }
 
       setFlipCellId(null);
       setIsFlipping(false);
@@ -146,74 +81,11 @@ const App = () => {
     }
   };
 
-  // REQ-006: Logic ăn hàng điểm khi lật đủ đường thẳng/chéo
-  const checkLines = (currentGrid: Grid) => {
-    let bonusPoints = 0;
-    const messages: string[] = [];
-    const newLines: string[] = [];
-
-    // Kiểm tra Hàng Ngang
-    for (let r = 0; r < 5; r++) {
-      const key = `row-${r}`;
-      if (currentGrid[r].every(cell => cell.isRevealed) && !wonLines.includes(key)) {
-        bonusPoints += 150;
-        messages.push(`Hàng ${r + 1}`);
-        newLines.push(key);
-      }
-    }
-
-    // Kiểm tra Hàng Dọc
-    for (let c = 0; c < 5; c++) {
-      const key = `col-${c}`;
-      let isFull = true;
-      for (let r = 0; r < 5; r++) {
-        if (!currentGrid[r][c].isRevealed) isFull = false;
-      }
-      if (isFull && !wonLines.includes(key)) {
-        bonusPoints += 150;
-        messages.push(`Cột ${c + 1}`);
-        newLines.push(key);
-      }
-    }
-
-    // Kiểm tra Đường Chéo
-    let diag1Full = true;
-    let diag2Full = true;
-    for (let i = 0; i < 5; i++) {
-      if (!currentGrid[i][i].isRevealed) diag1Full = false;
-      if (!currentGrid[i][4 - i].isRevealed) diag2Full = false;
-    }
-    if (diag1Full && !wonLines.includes('diag-1')) {
-      bonusPoints += 300;
-      messages.push('Chéo chính');
-      newLines.push('diag-1');
-    }
-    if (diag2Full && !wonLines.includes('diag-2')) {
-      bonusPoints += 300;
-      messages.push('Chéo phụ');
-      newLines.push('diag-2');
-    }
-
-    if (newLines.length > 0) {
-      setWonLines(prev => [...prev, ...newLines]);
-      setScore(prev => prev + bonusPoints);
-
-      // Dừng trò chơi khi đã ăn đủ 3 line
-      if (wonLines.length + newLines.length >= 3) {
-        setBannerMessage(`🎉 Đã ăn đủ 3 line! Trò chơi kết thúc.`);
-      } else {
-        setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (+${bonusPoints} điểm)`);
-        setTimeout(() => setBannerMessage(''), 3000); // Xóa thông báo sau 3s
-      }
-    }
-  };
-
   // Highlight cố định cho các hàng/cột/chéo đã hoàn thành
   const winningCells = getWinningCells(grid);
 
-  // Tính toán % thanh tiến độ
-  const maxMilestone = MILESTONES[MILESTONES.length - 1];
-  const progressPercent = Math.min((score / maxMilestone) * 100, 100);
+  // Tính toán % thanh tiến độ dựa trên điểm và các mốc phần thưởng
+  const progressPercent = calculateProgress(score, MILESTONES);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center p-4 font-sans max-w-xl mx-auto relative overflow-hidden">
