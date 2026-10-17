@@ -8,3 +8,5 @@ export const INITIAL_TURNS = 200;
 
 // Các mốc phần thưởng cho thanh tiến độ
 export const MILESTONES = [100, 300, 600, 1000];
+
+export const GAME_TITLE = 'Bữa Tiệc Bãi Biển';
