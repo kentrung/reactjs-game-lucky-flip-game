@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
 import { INITIAL_TURNS, MILESTONES, REWARDS, REQUIRED_WON_LINES } from './constants';
-import './index.css'; // Import file CSS (Tailwind)
+import './index.css';
 import Header from './components/Header';
 import GameControls from './components/GameControls';
 import {
@@ -22,7 +22,7 @@ const App = () => {
   const [turns, setTurns] = useState(INITIAL_TURNS);
   const [score, setScore] = useState(0); // Dùng cho thanh tiến độ (REQ-004)
   const [bannerMessage, setBannerMessage] = useState('');
-  const [isSkipChecked, setIsSkipChecked] = useState(false);
+  const [isSkipChecked, setIsSkipChecked] = useState(true);
   const [flipCellId, setFlipCellId] = useState<string | null>(null);
   const [isFlipping, setIsFlipping] = useState(false);
   const [wonLines, setWonLines] = useState<string[]>([]);
@@ -100,10 +100,10 @@ const App = () => {
   // Highlight cố định cho các hàng/cột/chéo đã hoàn thành
   const winningCells = getWinningCells(grid);
 
-  // Lấy màu nền tương ứng với điểm thưởng
+  // Lấy class cấp độ tương ứng với điểm thưởng
   const getRewardColor = (points: number): string => {
     const reward = REWARDS.find(r => r.points === points);
-    return reward?.color ?? 'bg-yellow-100';
+    return reward?.level ?? 'level1';
   };
 
   // Tính toán % thanh tiến độ dựa trên điểm và các mốc phần thưởng
@@ -120,7 +120,7 @@ const App = () => {
               <div 
                 className="w-full bg-gradient-to-t from-yellow-400 to-yellow-200 transition-all duration-500"
                 style={{ height: `${progressPercent}%` }}
-              ></div>
+              />
             </div>
             {/* Các mốc phần thưởng */}
             <div className="flex flex-col justify-between py-2 text-[10px] text-gray-400">
@@ -136,7 +136,7 @@ const App = () => {
         </div>
 
         {/* REQ-001: Khung trò chơi 5x5 bao ngoài bởi vòng ô điểm 7x7 */}
-        <div className="flex-1 grid grid-cols-7 gap-1 bg-[#411a1b] p-2 rounded-lg">
+        <div className="flex-1 grid grid-cols-7 gap-1">
           {Array.from({ length: 7 }).flatMap((_, R) =>
             Array.from({ length: 7 }).map((_, C) => {
               const isBoard = R >= 1 && R <= 5 && C >= 1 && C <= 5;
@@ -150,18 +150,20 @@ const App = () => {
                   >
                     <div className={`cell-inner ${flipCellId === cell.id || cell.isRevealed ? 'flipped' : ''} ${isSkipChecked ? 'no-transition' : ''}`}>
                       {/* Mặt trước: ô chưa lật */}
-                      <div className={`cell-face text-xl font-bold ${cell.isLocked ? 'bg-gray-700' : 'bg-yellow-400'}`}>
-                        {cell.isLocked ? (
-                          <span className="text-gray-400">🔒</span>
-                        ) : (
-                          <span className="text-yellow-600 opacity-50">?</span>
-                        )}
+                      <div className="cell-face">
+                        <div className="cell-face-inner text-xl font-bold">
+                          {cell.isLocked ? (
+                            <span className="text-gray-400">🔒</span>
+                          ) : (
+                            <span className="text-yellow-600 opacity-50">?</span>
+                          )}
+                        </div>
                       </div>
                       {/* Mặt sau: phần thưởng khi lật */}
-                      <div className={`cell-face cell-face-back ${getRewardColor(cell.points)} text-black text-xl font-bold`}>
-                        <div className="flex flex-col items-center">
+                      <div className={`cell-face cell-face-back ${getRewardColor(cell.points)} text-xl font-bold`}>
+                        <div className="cell-face-inner flex flex-col items-center">
                           <span>{cell.icon}</span>
-                          <span className="text-[10px] text-gray-600">x{cell.points}</span>
+                          <span className="text-[12px]">x{cell.points}</span>
                         </div>
                       </div>
                     </div>
@@ -175,13 +177,13 @@ const App = () => {
               return (
                 <div
                   key={`ring-${R}-${C}`}
-                  className="aspect-square relative border border-yellow-400 rounded-md transition-all duration-300"
+                  className="aspect-square relative rounded-md transition-all duration-300"
                 >
                   <div
                     className={`absolute inset-0 flex items-center justify-center rounded-md text-[10px] font-bold ${
                       isWon
                         ? 'bg-yellow-400 text-black shadow'
-                        : 'bg-blue-800/60 text-yellow-400 opacity-50'
+                        : 'bg-[#797f96] text-yellow-400 opacity-50'
                     }`}
                   >
                     {lineKey ? `+${getLinePoints(lineKey)}` : ''}

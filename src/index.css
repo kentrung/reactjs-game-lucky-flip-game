@@ -32,10 +32,55 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.375rem;
+  background-color: #fcfbd1;
+  border: 2px solid #fcfbd1;
+  border-radius: 4px;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+.cell-face-inner {
+  background-color: #fcca82;
+  border-radius: 3px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.cell-face.level1 {
+  background: #038fff;
+  border: 2px solid #038fff;
+}
+.cell-face.level1 .cell-face-inner {
+  background: #038fff;
+  border: 2px solid #0066e9;
+}
+.cell-face.level2 {
+  background: #be26ff;
+  border: 2px solid #be26ff;
+}
+.cell-face.level2 .cell-face-inner {
+  background: #be26ff;
+  border: 2px solid #a820e0;
+}
+.cell-face.level3 {
+  background: #fde507;
+  border: 2px solid #fde507;
+  color: #d89000;
+}
+.cell-face.level3 .cell-face-inner {
+  background: #fde507;
+  border: 2px solid #eb9d00;
+}
+.cell-face.level4 {
+  background: #fe4c68;
+  border: 2px solid #fe4c68;
+}
+.cell-face.level4 .cell-face-inner {
+  background: #fe4c68;
+  border: 2px solid #e00643;
+}
+
 
 .cell-face-back {
   transform: rotateY(180deg);
@@ -43,7 +88,7 @@ body {
 
 .cell.winning {
   z-index: 10;
-  border-radius: 0.375rem;
+  border-radius: 3px;
   outline: 2px solid #facc15;
   outline-offset: 1px;
   box-shadow: 0 0 8px 2px rgba(250, 204, 21, 0.75);

@@ -1,10 +1,10 @@
 // Cấu hình các phần thưởng có thể xuất hiện trong ô (weight = tỉ lệ tương đối)
 export const REWARDS = [
-  { icon: '🥥', points: 5, color: 'bg-blue-400', weight: 45 },
-  { icon: '🥥', points: 10, color: 'bg-purple-400', weight: 30 },
-  { icon: '🥥', points: 15, color: 'bg-yellow-300', weight: 15 },
-  { icon: '🥥', points: 20, color: 'bg-red-400', weight: 5 },
-  { icon: '🎟️', points: 1, color: 'bg-green-400', isTicket: true, weight: 5 },
+  { icon: '🥥', points: 5, level: 'level1', weight: 45 },
+  { icon: '🥥', points: 10, level: 'level2', weight: 30 },
+  { icon: '🥥', points: 15, level: 'level3', weight: 15 },
+  { icon: '🥥', points: 20, level: 'level4', weight: 5 },
+  { icon: '🎟️', points: 1, level: 'level4', weight: 5, isTicket: true },
 ];
 
 // Số lượt chơi ban đầu
