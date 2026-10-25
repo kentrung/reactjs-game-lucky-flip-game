@@ -1,9 +1,11 @@
+import { REQUIRED_STARS } from "../constants";
+
 interface SpecialLevelModalProps {
   open: boolean;
   onPlay: () => void;
 }
 
-// Popup thông báo khi thu thập đủ 3 ngôi sao
+// Popup thông báo khi thu thập đủ REQUIRED_STARS
 export default function SpecialLevelModal({ open, onPlay }: SpecialLevelModalProps) {
   if (!open) return null;
 
@@ -13,7 +15,7 @@ export default function SpecialLevelModal({ open, onPlay }: SpecialLevelModalPro
         <div className="text-5xl mb-3">⭐</div>
         <h2 className="text-xl font-bold text-yellow-400 mb-2">Chúc mừng!</h2>
         <p className="text-sm text-gray-200 mb-6">
-          Bạn đã thu thập đủ <span className="font-bold text-yellow-400">3 ngôi sao</span>.
+          Bạn đã thu thập đủ <span className="font-bold text-yellow-400">{REQUIRED_STARS} ngôi sao</span>.
           <br />
           Bạn đã được vào <span className="font-bold text-yellow-400">màn chơi đặc biệt</span>!
         </p>
