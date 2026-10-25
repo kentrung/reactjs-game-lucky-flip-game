@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
-import { INITIAL_TURNS, MILESTONES, REWARDS, REQUIRED_WON_LINES, regenerateRingCellRewards, getRingCellReward } from './constants';
+import { INITIAL_TURNS, MILESTONES, REQUIRED_STARS, REWARDS, REQUIRED_WON_LINES, regenerateRingCellRewards, getRingCellReward } from './constants';
 import './index.css';
 import Header from './components/Header';
 import GameControls from './components/GameControls';
+import SpecialLevelModal from './components/SpecialLevelModal';
 import {
   generateInitialGrid,
   cloneGrid,
@@ -27,7 +28,9 @@ const App = () => {
   const [isFlipping, setIsFlipping] = useState(false);
   const [wonLines, setWonLines] = useState<string[]>([]);
   const [ticketsCollected, setTicketsCollected] = useState(0);
-  const [starsCollected, setStarsCollected] = useState(0);
+  const [starsCollected, setStarsCollected] = useState(0); // Tổng số sao đã thu thập (cộng dồn qua các ván)
+  const [pendingStars, setPendingStars] = useState(0); // Sao ăn được trong ván, chỉ cộng khi nhấn NHẬN NGAY
+  const [showSpecialLevelPopup, setShowSpecialLevelPopup] = useState(false);
 
   // --- LOGIC XỬ LÝ ---
 
@@ -83,7 +86,8 @@ const App = () => {
               if (k === key) {
                 const reward = getRingCellReward(r, c);
                 if (reward) {
-                  if (reward.points) extraPoints += reward.points;
+                  // Vé và ngôi sao không tính điểm, chỉ dừa mới cộng điểm
+                  if (reward.points && !reward.tickets && !reward.stars) extraPoints += reward.points;
                   if (reward.tickets) extraTickets += reward.tickets;
                   if (reward.stars) extraStars += reward.stars;
                 }
@@ -96,23 +100,24 @@ const App = () => {
           setTicketsCollected(prev => prev + extraTickets);
         }
         if (extraStars > 0) {
-          setStarsCollected(prev => prev + extraStars);
+          // Chỉ tạm giữ số sao, đợi nhấn NHẬN NGAY mới thu thập
+          setPendingStars(prev => prev + extraStars);
         }
 
-        // Chỉ bắt đầu cộng điểm vào score sau khi đã ăn đủ 3 hàng
-        if (wonLines.length >= REQUIRED_WON_LINES || totalWonAfter >= REQUIRED_WON_LINES) {
-          setScore(prev => prev + bonusPoints + extraPoints);
+        // Cộng toàn bộ điểm dừa của các line vừa ăn được
+        const linePoints = bonusPoints + extraPoints;
+        if (linePoints > 0) {
+          setScore(prev => prev + linePoints);
         }
 
         // Dừng trò chơi khi đã ăn đủ 3 line
         if (totalWonAfter >= REQUIRED_WON_LINES) {
-          setBannerMessage('🎉 Đã ăn đủ 3 line! Nhấn THU THẬP để cộng điểm và bắt đầu ván mới.');
+          setBannerMessage('🎉 Đã ăn đủ 3 line! Nhấn NHẬN NGAY để nhận dừa và bắt đầu ván mới.');
         } else {
           const rewardText: string[] = [];
-          if (bonusPoints > 0) rewardText.push(`+${bonusPoints} điểm`);
-          if (extraPoints > 0) rewardText.push(`+${extraPoints} điểm (vòng ngoài)`);
+          if (linePoints > 0) rewardText.push(`+${linePoints} dừa`);
           if (extraTickets > 0) rewardText.push(`+${extraTickets} vé chơi`);
-          if (extraStars > 0) rewardText.push(`+${extraStars} ngôi sao`);
+          if (extraStars > 0) rewardText.push(`+${extraStars} ngôi sao (nhận khi NHẬN NGAY)`);
           setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (${rewardText.join(', ')})`);
           setTimeout(() => setBannerMessage(''), 3000);
         }
@@ -139,15 +144,32 @@ const App = () => {
       setTurns(prev => prev + ticketsCollected);
     }
 
+    // Chỉ thu thập sao khi nhấn NHẬN NGAY; đủ điều kiện thì mở popup
+    const nextStars = starsCollected + pendingStars;
+    setStarsCollected(nextStars);
+    setPendingStars(0);
+    if (starsCollected < REQUIRED_STARS && nextStars >= REQUIRED_STARS) {
+      setShowSpecialLevelPopup(true);
+    }
+
     // Reset bàn chơi cho ván mới
     regenerateRingCellRewards();
     setGrid(generateInitialGrid());
     setWonLines([]);
     setTicketsCollected(0);
-    setStarsCollected(0);
     setFlipCellId(null);
     setIsFlipping(false);
-    setBannerMessage('Đã thu thập điểm! Bàn chơi đã được reset.');
+    const starText = pendingStars > 0 ? ` ⭐ +${pendingStars} (tổng ${nextStars}/${REQUIRED_STARS}).` : '';
+    setBannerMessage(`Đã thu thập dừa!${starText} Bàn chơi đã được reset.`);
+    setTimeout(() => setBannerMessage(''), 3000);
+  };
+
+  // Vào màn chơi đặc biệt khi đã thu thập đủ 3 ngôi sao
+  const handleEnterSpecialLevel = () => {
+    setShowSpecialLevelPopup(false);
+    // Dùng 3 sao đã thu thập để vào màn chơi đặc biệt
+    setStarsCollected(prev => Math.max(0, prev - REQUIRED_STARS));
+    setBannerMessage('🎉 Chào mừng đến màn chơi đặc biệt!');
     setTimeout(() => setBannerMessage(''), 3000);
   };
 
@@ -186,7 +208,7 @@ const App = () => {
               ))}
             </div>
           </div>
-          <div className="text-xs mt-2">Điểm: {score}</div>
+          <div className="text-xs mt-2 text-center leading-tight">Số dừa: {score}</div>
         </div>
 
         {/* REQ-001: Khung trò chơi 5x5 bao ngoài bởi vòng ô điểm 7x7 */}
@@ -285,6 +307,9 @@ const App = () => {
         onPlay={handlePlay}
         onCollect={handleCollect}
       />
+
+      {/* Popup màn chơi đặc biệt khi đủ 3 ngôi sao */}
+      <SpecialLevelModal open={showSpecialLevelPopup} onPlay={handleEnterSpecialLevel} />
     </div>
   );
 };

@@ -1,9 +1,10 @@
+import { COCONUT_ICON } from '../constants';
 import type { Cell, Grid, LineResult } from '../types';
 import { GRID_SIZE } from './grid';
 
-// Điểm thưởng của từng loại đường: hàng/cột = 150, chéo = 300
-export const getLinePoints = (key: string): number =>
-  key.startsWith('diag') ? 300 : 150;
+// Chỉ dừa mới được tính điểm; vé và ngôi sao không được tính điểm
+const getCoconutPoints = (cells: Cell[]): number =>
+  cells.reduce((sum, cell) => sum + (cell.icon === COCONUT_ICON ? cell.points : 0), 0);
 
 // Kiểm tra 1 đường (danh sách ô) đã lật đủ tất cả ô chưa
 export const isLineFull = (cells: Cell[]): boolean =>
@@ -32,31 +33,31 @@ export const checkLines = (grid: Grid, wonLines: string[]): LineResult => {
   const messages: string[] = [];
   const newLines: string[] = [];
 
-  // Ghi nhận phần thưởng cho 1 đường nếu đã lật đủ và chưa từng được ăn
-  const award = (cells: Cell[], key: string, points: number, label: string) => {
+  // Cộng toàn bộ điểm dừa của 1 đường nếu đã lật đủ và chưa từng được ăn
+  const award = (cells: Cell[], key: string, label: string) => {
     if (isLineFull(cells) && !wonLines.includes(key)) {
-      bonusPoints += points;
+      bonusPoints += getCoconutPoints(cells);
       messages.push(label);
       newLines.push(key);
     }
   };
 
-  // Hàng ngang: 5 hàng, mỗi hàng 150 điểm
+  // Hàng ngang: 5 hàng
   for (let r = 0; r < GRID_SIZE; r++) {
-    award(grid[r], `row-${r}`, 150, `Hàng ${r + 1}`);
+    award(grid[r], `row-${r}`, `Hàng ${r + 1}`);
   }
 
-  // Hàng dọc: 5 cột, mỗi cột 150 điểm
+  // Hàng dọc: 5 cột
   for (let c = 0; c < GRID_SIZE; c++) {
     const column = grid.map(row => row[c]);
-    award(column, `col-${c}`, 150, `Cột ${c + 1}`);
+    award(column, `col-${c}`, `Cột ${c + 1}`);
   }
 
-  // Đường chéo chính & phụ: mỗi đường 300 điểm
+  // Đường chéo chính & phụ
   const mainDiagonal = grid.map((row, i) => row[i]);
   const antiDiagonal = grid.map((row, i) => row[GRID_SIZE - 1 - i]);
-  award(mainDiagonal, 'diag-1', 300, 'Chéo chính');
-  award(antiDiagonal, 'diag-2', 300, 'Chéo phụ');
+  award(mainDiagonal, 'diag-1', 'Chéo chính');
+  award(antiDiagonal, 'diag-2', 'Chéo phụ');
 
   return { bonusPoints, messages, newLines };
 };

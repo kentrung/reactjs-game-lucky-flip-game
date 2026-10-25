@@ -1,3 +1,6 @@
+// Icon dừa - loại phần thưởng duy nhất được tính điểm
+export const COCONUT_ICON = '🥥';
+
 // Cấu hình các phần thưởng có thể xuất hiện trong ô (weight = tỉ lệ tương đối)
 export const REWARDS = [
   { icon: '🥥', points: 5, level: 'level1', weight: 45 },
@@ -13,8 +16,11 @@ export const INITIAL_TURNS = 200;
 // Số line cần ăn để hoàn thành trò chơi
 export const REQUIRED_WON_LINES = 3;
 
+// Số ngôi sao cần thu thập để mở màn chơi đặc biệt
+export const REQUIRED_STARS = 1;
+
 // Các mốc phần thưởng cho thanh tiến độ
-export const MILESTONES = [0, 500, 1000, 1500, 2000];
+export const MILESTONES = [0, 1000, 2000, 3000, 4000, 5000];
 
 // Tiêu đề của trò chơi
 export const GAME_TITLE = 'Bữa Tiệc Bãi Biển';
@@ -76,17 +82,4 @@ export const regenerateRingCellRewards = () => {
 
 export const getRingCellReward = (r: number, c: number): RingCellReward | null => {
   return RING_CELL_REWARDS[`${r},${c}`] || null;
-};
-
-// Lấy màu level theo điểm thưởng cho ô vòng ngoài
-export const getRingRewardColor = (reward?: { points?: number; tickets?: number; stars?: number; level?: string } | null): string => {
-  if (!reward) return 'level1';
-  if (reward.level) return reward.level;
-  if (reward.stars) return 'level4';
-  if (reward.tickets) return 'level4';
-  if (reward.points && reward.points >= 50) return 'level4';
-  if (reward.points && reward.points >= 30) return 'level3';
-  if (reward.points && reward.points >= 15) return 'level3';
-  if (reward.points && reward.points >= 10) return 'level2';
-  return 'level1';
 };
