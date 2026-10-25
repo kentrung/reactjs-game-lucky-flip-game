@@ -14,7 +14,7 @@ export const INITIAL_TURNS = 200;
 export const REQUIRED_WON_LINES = 3;
 
 // Các mốc phần thưởng cho thanh tiến độ
-export const MILESTONES = [100, 300, 600, 1000];
+export const MILESTONES = [0, 500, 1000, 1500, 2000];
 
 // Tiêu đề của trò chơi
 export const GAME_TITLE = 'Bữa Tiệc Bãi Biển';

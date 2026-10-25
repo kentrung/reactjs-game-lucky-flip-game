@@ -216,10 +216,10 @@ const App = () => {
                       {/* Mặt sau: phần thưởng khi lật */}
                       <div className={`cell-face cell-face-back ${getRewardColor(cell.points)} text-xl font-bold`}>
                         <div className="cell-face-inner flex flex-col items-center leading-none">
-                          <div className="w-[28px] h-[28px] flex items-center justify-center overflow-hidden">
+                          <div className="w-7 h-7 flex items-center justify-center overflow-hidden">
                             <span style={{ fontSize: '20px', lineHeight: 1 }}>{cell.icon}</span>
                           </div>
-                          <span className="text-[12px] leading-none -mt-[1px]">x{cell.points}</span>
+                          <span className="text-[12px] leading-none -mt-px">x{cell.points}</span>
                         </div>
                       </div>
                     </div>
@@ -237,20 +237,20 @@ const App = () => {
                   className={`aspect-square relative rounded-md transition-all duration-300 ${isWon ? 'ring-winning' : ''}`}
                 >
                   <div
-                    className={`absolute inset-0 flex items-center justify-center rounded-md font-bold transition-all duration-300 ${
+                    className={`absolute inset-0 bg-[#797f96] flex items-center justify-center rounded-md font-bold transition-all duration-300 ${
                       isWon && ringReward
-                        ? 'bg-yellow-400 text-white shadow'
+                        ? 'text-white shadow'
                         : ringReward
-                        ? 'bg-[#797f96] text-white opacity-40'
-                        : 'bg-[#797f96]'
+                        ? 'text-white opacity-40'
+                        : ''
                     }`}
                   >
                     {ringReward ? (
                       <div className="flex flex-col items-center leading-none">
-                        <div className="w-[28px] h-[28px] flex items-center justify-center overflow-hidden">
+                        <div className="w-7 h-7 flex items-center justify-center overflow-hidden">
                           <span style={{ fontSize: '20px', lineHeight: 1 }}>{ringReward.icon}</span>
                         </div>
-                        <span className="text-[12px] leading-none -mt-[1px]">
+                        <span className="text-[12px] leading-none -mt-px">
                           {ringReward.tickets ? `x${ringReward.tickets}` : ringReward.stars ? `x${ringReward.stars}` : ringReward.points ? `x${ringReward.points}` : ''}
                         </span>
                       </div>

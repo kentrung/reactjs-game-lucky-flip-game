@@ -38,7 +38,7 @@ export default function GameControls({
         disabled={canCollect ? isFlipping : (turns <= 0 || isFlipping)}
         className={`px-8 py-2 rounded-lg text-xl font-bold shadow-lg transition-transform active:scale-95 ${
           canCollect
-            ? 'bg-[#22c55e] text-black hover:bg-green-400 cursor-pointer'
+            ? 'bg-[#fdd60d] text-black hover:from-yellow-400 hover:to-yellow-300 cursor-pointer'
             : turns > 0 && !isFlipping
             ? 'bg-[#fdd60d] text-black hover:from-yellow-400 hover:to-yellow-300 cursor-pointer'
             : 'bg-gray-600 text-gray-400 cursor-not-allowed'
