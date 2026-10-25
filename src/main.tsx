@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faLock } from '@fortawesome/free-solid-svg-icons';
-import { INITIAL_TURNS, MILESTONES, REWARDS, REQUIRED_WON_LINES } from './constants';
+import { INITIAL_TURNS, MILESTONES, REWARDS, REQUIRED_WON_LINES, regenerateRingCellRewards, getRingCellReward } from './constants';
 import './index.css';
 import Header from './components/Header';
 import GameControls from './components/GameControls';
@@ -13,7 +13,7 @@ import {
   getWinningCells,
   getRandomAvailableCell,
 } from './utils/grid';
-import { getLinePoints, getRingLineKey, checkLines } from './utils/lines';
+import { getRingLineKey, checkLines } from './utils/lines';
 import { calculateProgress } from './utils/progress';
 
 const App = () => {
@@ -27,6 +27,7 @@ const App = () => {
   const [isFlipping, setIsFlipping] = useState(false);
   const [wonLines, setWonLines] = useState<string[]>([]);
   const [ticketsCollected, setTicketsCollected] = useState(0);
+  const [starsCollected, setStarsCollected] = useState(0);
 
   // --- LOGIC XỬ LÝ ---
 
@@ -67,21 +68,53 @@ const App = () => {
       const { bonusPoints, messages, newLines } = checkLines(newGrid, wonLines);
 
       if (newLines.length > 0) {
+        const totalWonAfter = wonLines.length + newLines.length;
         setWonLines(prev => [...prev, ...newLines]);
-        setScore(prev => prev + bonusPoints);
+
+        // Áp dụng phần thưởng vòng ngoài cho các line mới ăn được
+        let extraPoints = 0;
+        let extraTickets = 0;
+        let extraStars = 0;
+        newLines.forEach(key => {
+          // Tìm tất cả ô rìa thuộc line này
+          for (let r = 0; r < 7; r++) {
+            for (let c = 0; c < 7; c++) {
+              const k = getRingLineKey(r, c);
+              if (k === key) {
+                const reward = getRingCellReward(r, c);
+                if (reward) {
+                  if (reward.points) extraPoints += reward.points;
+                  if (reward.tickets) extraTickets += reward.tickets;
+                  if (reward.stars) extraStars += reward.stars;
+                }
+              }
+            }
+          }
+        });
+
+        if (extraTickets > 0) {
+          setTicketsCollected(prev => prev + extraTickets);
+        }
+        if (extraStars > 0) {
+          setStarsCollected(prev => prev + extraStars);
+        }
+
+        // Chỉ bắt đầu cộng điểm vào score sau khi đã ăn đủ 3 hàng
+        if (wonLines.length >= REQUIRED_WON_LINES || totalWonAfter >= REQUIRED_WON_LINES) {
+          setScore(prev => prev + bonusPoints + extraPoints);
+        }
 
         // Dừng trò chơi khi đã ăn đủ 3 line
-        if (wonLines.length + newLines.length >= REQUIRED_WON_LINES) {
-          // Cộng tổng vé chơi đã thu thập vào turns
-          if (ticketsCollected > 0) {
-            setTurns(prev => prev + ticketsCollected);
-            setBannerMessage(`🎉 Đã ăn đủ 3 line! +${ticketsCollected} lượt từ vé chơi. Trò chơi kết thúc.`);
-          } else {
-            setBannerMessage('🎉 Đã ăn đủ 3 line! Trò chơi kết thúc.');
-          }
+        if (totalWonAfter >= REQUIRED_WON_LINES) {
+          setBannerMessage('🎉 Đã ăn đủ 3 line! Nhấn THU THẬP để cộng điểm và bắt đầu ván mới.');
         } else {
-          setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (+${bonusPoints} điểm)`);
-          setTimeout(() => setBannerMessage(''), 3000); // Xóa thông báo sau 3s
+          const rewardText: string[] = [];
+          if (bonusPoints > 0) rewardText.push(`+${bonusPoints} điểm`);
+          if (extraPoints > 0) rewardText.push(`+${extraPoints} điểm (vòng ngoài)`);
+          if (extraTickets > 0) rewardText.push(`+${extraTickets} vé chơi`);
+          if (extraStars > 0) rewardText.push(`+${extraStars} ngôi sao`);
+          setBannerMessage(`🎉 Ăn hàng: ${messages.join(', ')} (${rewardText.join(', ')})`);
+          setTimeout(() => setBannerMessage(''), 3000);
         }
       }
 
@@ -95,6 +128,27 @@ const App = () => {
     } else {
       setTimeout(finishFlip, 1000);
     }
+  };
+
+  // Thu thập điểm và reset bàn chơi sau khi hoàn thành 3 hàng
+  const handleCollect = () => {
+    if (wonLines.length < REQUIRED_WON_LINES) return;
+
+    // Cộng tổng vé chơi đã thu thập vào turns
+    if (ticketsCollected > 0) {
+      setTurns(prev => prev + ticketsCollected);
+    }
+
+    // Reset bàn chơi cho ván mới
+    regenerateRingCellRewards();
+    setGrid(generateInitialGrid());
+    setWonLines([]);
+    setTicketsCollected(0);
+    setStarsCollected(0);
+    setFlipCellId(null);
+    setIsFlipping(false);
+    setBannerMessage('Đã thu thập điểm! Bàn chơi đã được reset.');
+    setTimeout(() => setBannerMessage(''), 3000);
   };
 
   // Highlight cố định cho các hàng/cột/chéo đã hoàn thành
@@ -118,7 +172,7 @@ const App = () => {
           <div className="flex flex-1 w-full items-stretch justify-center gap-2">
             <div className="w-4 bg-gray-700 rounded-full relative overflow-hidden flex flex-col justify-end">
               <div 
-                className="w-full bg-gradient-to-t from-yellow-400 to-yellow-200 transition-all duration-500"
+                className="w-full bg-linear-to-t from-yellow-400 to-yellow-200 transition-all duration-500"
                 style={{ height: `${progressPercent}%` }}
               />
             </div>
@@ -161,9 +215,11 @@ const App = () => {
                       </div>
                       {/* Mặt sau: phần thưởng khi lật */}
                       <div className={`cell-face cell-face-back ${getRewardColor(cell.points)} text-xl font-bold`}>
-                        <div className="cell-face-inner flex flex-col items-center">
-                          <span>{cell.icon}</span>
-                          <span className="text-[12px]">x{cell.points}</span>
+                        <div className="cell-face-inner flex flex-col items-center leading-none">
+                          <div className="w-[28px] h-[28px] flex items-center justify-center overflow-hidden">
+                            <span style={{ fontSize: '20px', lineHeight: 1 }}>{cell.icon}</span>
+                          </div>
+                          <span className="text-[12px] leading-none -mt-[1px]">x{cell.points}</span>
                         </div>
                       </div>
                     </div>
@@ -171,22 +227,36 @@ const App = () => {
                 );
               }
 
-              // Ô rìa: hiện ổ khóa khi chưa ăn được, sáng rõ + mất khóa khi ăn được
+              // Ô rìa: hiện phần thưởng luôn, mờ khi chưa ăn, sáng rõ khi ăn được
               const lineKey = getRingLineKey(R, C);
               const isWon = lineKey ? wonLines.includes(lineKey) : false;
+              const ringReward = getRingCellReward(R, C);
               return (
                 <div
                   key={`ring-${R}-${C}`}
-                  className="aspect-square relative rounded-md transition-all duration-300"
+                  className={`aspect-square relative rounded-md transition-all duration-300 ${isWon ? 'ring-winning' : ''}`}
                 >
                   <div
-                    className={`absolute inset-0 flex items-center justify-center rounded-md text-[10px] font-bold ${
-                      isWon
-                        ? 'bg-yellow-400 text-black shadow'
-                        : 'bg-[#797f96] text-yellow-400 opacity-50'
+                    className={`absolute inset-0 flex items-center justify-center rounded-md font-bold transition-all duration-300 ${
+                      isWon && ringReward
+                        ? 'bg-yellow-400 text-white shadow'
+                        : ringReward
+                        ? 'bg-[#797f96] text-white opacity-40'
+                        : 'bg-[#797f96]'
                     }`}
                   >
-                    {lineKey ? `+${getLinePoints(lineKey)}` : ''}
+                    {ringReward ? (
+                      <div className="flex flex-col items-center leading-none">
+                        <div className="w-[28px] h-[28px] flex items-center justify-center overflow-hidden">
+                          <span style={{ fontSize: '20px', lineHeight: 1 }}>{ringReward.icon}</span>
+                        </div>
+                        <span className="text-[12px] leading-none -mt-[1px]">
+                          {ringReward.tickets ? `x${ringReward.tickets}` : ringReward.stars ? `x${ringReward.stars}` : ringReward.points ? `x${ringReward.points}` : ''}
+                        </span>
+                      </div>
+                    ) : (
+                      <div></div>
+                    )}
                   </div>
                   {!isWon && lineKey && (
                     <FontAwesomeIcon
@@ -213,6 +283,7 @@ const App = () => {
         isSkipChecked={isSkipChecked}
         onSkipChange={setIsSkipChecked}
         onPlay={handlePlay}
+        onCollect={handleCollect}
       />
     </div>
   );
